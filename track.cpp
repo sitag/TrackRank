@@ -2,7 +2,7 @@
 
 MIT License
 
-Copyright (c) 2016
+Copyright (c) 2016  
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -29,7 +29,7 @@ SOFTWARE.
 #endif
 
 #ifndef TAG
-#define TAG "UNTAGGED"
+#define TAG "UNVERSIONED"
 #endif
 
 #include <cstdlib>
@@ -53,7 +53,7 @@ SOFTWARE.
 #include "cxx-prettyprint/prettyprint.hpp"
 
 namespace Compute {
-	inline void __dot(const std::vector<double>& v, const std::vector<double>& u, int dim, double& d){
+	inline void absDot(const std::vector<double>& v, const std::vector<double>& u, int dim, double& d){
 		d = 0;
 		for(int k = 0; k < dim; k++){
 			d += u[k]*v[k];
@@ -70,12 +70,12 @@ namespace Compute {
 		std::string filename = std::string(prefix) + "." + std::to_string(threadId);
 		if(FUtils::exists(filename)){
 			msgStream << "..failed:" << filename << " exists";
-			Log::Mutexed::cerr(msgStream);	
+			Log::Mutexed::logger(msgStream);	
 			return;		
 		}
 		std::ofstream outfile(filename);
 		msgStream << "..tracking:" << filename;
-		Log::Mutexed::cerr(msgStream);
+		Log::Mutexed::logger(msgStream);
 		auto& byIndex = *(__byIndex);
 		MapOfUniqPtrs<int, std::vector<double>> distances; 
 		int dim = byIndex[0]->size();
@@ -88,9 +88,9 @@ namespace Compute {
 				outfile << "TSELECT[" << i << "]\t";
 				auto& u = *(byIndex[i].get());
 				TrackingQueue::fillMaxSentinels(closest, byIndex.size());
-				for(int j = 0; j < byIndex.size(); j++){
+				for(unsigned int j = 0; j < byIndex.size(); j++){
 					auto& v = *(byIndex[j].get());
-					Compute::__dot(u, v, dim, d);
+					Compute::absDot(u, v, dim, d);
 					TrackingQueue::update(d, j, closest);
 				}
 				TrackingQueue::dumpfSelected(closest, onlyRecordThese, outfile);
@@ -98,7 +98,7 @@ namespace Compute {
 		}
 		outfile.close();
 		msgStream << "..OK:" << filename; 
-		Log::Mutexed::cerr(msgStream);
+		Log::Mutexed::logger(msgStream);
 	}
 
 	ImmutableVectorizedVectors intoImmutable(VectorizedVectors& byIndex){
@@ -133,26 +133,28 @@ namespace Compute {
 
 int main(int argc, char* argv[]){
 	std::cerr << "compiled:" << TAG << "\n\n" << std::endl; 
-	TrackingQueue::SanityCheck::queueOrdering<TrackingQueue::MinTrackingQueueCompare>(true);
+	//TrackingQueue::SanityCheck::queueOrdering<TrackingQueue::MinTrackingQueueCompare>(true);
 	auto binaryname = std::string(argv[0]);
-
 	Cmn::timestamp(binaryname);
 	Cmn::Parsed parsed(argc, argv);
 
-	bool debug = parsed.has2("-debug");
+	//bool debug = parsed.has2("-debug");
 	auto prefix = parsed["-prefix"];
 	auto fTrackThese = parsed["-only-these"];
-	auto fRecordThese = parsed["-record-these"];
+	auto fRankThese = parsed["-rank-these"];
 
 	if(parsed.has2("-h")){
-		std::cerr << "usage:\n\t./load -nV:3 -eigen-values:./eigenvalues.test -vectors:./vectors.test -dim:3 -track:1 -block-size:2 -prefix:./closest_coords" << std::endl;
+		std::cerr << "usage:\n\t./track_rank -nV:<N> -eigen-values:<file> -vectors:<file> -dim:<N> -rank-these:<file> -track-these:<file> -block-size:2 -prefix:<prefix>" << std::endl;
 		std::exit(1);
 	} 
 
-	const int dim = std::stoi(parsed["-dim"]);
-	const int track = std::stoi(parsed["-track"]); 
-	const int nV = stoi(parsed["-nV"]);
-	const int block = stoi(parsed["-block-size"]);
+	const unsigned int dim = std::stoi(parsed["-dim"]);
+	const unsigned int track = std::stoi(parsed["-track"]); // ignored now 
+	const unsigned int nV = stoi(parsed["-nV"]);
+	const unsigned int block = stoi(parsed["-block-size"]);
+	if(!(std::max(dim, nV) < TrackingQueue::SENTINEL_COORD)){
+		std::cerr << "dimensions too large" << std::endl;
+	}
 
 
 	std::cerr << parsed.json() << std::endl; 
@@ -172,13 +174,13 @@ int main(int argc, char* argv[]){
 	}
 
 	VectorizedVectors byIndex;
-	for(int i = 0; i< nV; i++){
+	for(unsigned int i = 0; i< nV; i++){
 		byIndex.push_back(std::unique_ptr<std::vector<double>>(new std::vector<double>()));
-		(*byIndex.at(i)).reserve(dim);
+		byIndex.at(i)->reserve(dim);
 	} 
 	std::vector<double> eigenValues;
 	std::unordered_set<int> trackThese;
-	std::unordered_set<int> recordThese;
+	std::unordered_set<int> rankThese;
 
 	PowerGraphLoad::loadVectors(parsed["-vectors"], dim, byIndex);
 	std::cerr << "#nVectors:" << byIndex.size() << std::endl;
@@ -191,31 +193,27 @@ int main(int argc, char* argv[]){
 		}
 		PowerGraphLoad::loadToTrack(fTrackThese, trackThese);
 	}
-	if(fRecordThese.empty()){
-		std::cerr << "#ERR: missing recording file" << std::endl;
+	if(fRankThese.empty()){
+		std::cerr << "#ERR: missing ranking file" << std::endl;
 		std::exit(1);
 	}
-	PowerGraphLoad::loadToTrack(fRecordThese, recordThese);
-
+	PowerGraphLoad::loadToTrack(fRankThese, rankThese);
 	PowerGraphLoad::rescaleVectors(byIndex, eigenValues);
 	Compute::updateVectorInPlace(Compute::normalizeL2, byIndex);
 
 	const ImmutableVectorizedVectors iByIndex = Compute::intoImmutable(byIndex);
-	//const ImmutableVectorizedVectors* __byIndex = &iByIndex;
 
 	std::vector<std::thread> workers;
-	for(int b = 0; b < iByIndex.size(); b += block){
-		workers.push_back(std::thread(Compute::selectedDot, &iByIndex, b, b + block, b/block, track, prefix, &trackThese, &recordThese));
+	for(unsigned int b = 0; b < iByIndex.size(); b += block){
+		workers.push_back(std::thread(Compute::selectedDot, &iByIndex, b, b + block, b/block, track, prefix, &trackThese, &rankThese));
 	}
 	std::ostringstream msgStream;
 	msgStream << "#__DISTRIBUTED_ACROSS_" << workers.size() << "_THREADS__";
-	Log::Mutexed::cerr(msgStream);
+	Log::Mutexed::logger(msgStream);
 
 	for(auto& w : workers){
 		w.join();
 	}
-
-	
 	std::cerr << "#OK" << std::endl;
 
 }

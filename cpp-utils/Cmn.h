@@ -14,52 +14,6 @@
 #include <unordered_map>
 #include <limits>
 
-namespace ScopeGuard {
-	typedef std::vector<std::vector<double>*> VectorOfVector;
-	typedef std::unordered_map<int, std::vector<int>*> HashOfVector;
-
-	template <typename T> class Track;
-	template <> class Track<HashOfVector> {
-		public:
-			HashOfVector* data;
-			std::string tag;
-			Track(HashOfVector& payload, std::string tag = "...") {
-				this->tag = tag;
-				this->data  = &payload;
-			}
-			virtual ~Track(){
-				std::vector<int>* temp = NULL;
-				for(auto& key_value: *this->data){
-					temp = key_value.second;
-					key_value.second = NULL;
-					delete temp;
-				}
-				std::cerr << "#MSG[SG].. collected:" << this->tag << std::endl;
-				this->data->clear();
-			}
-	};
-	template <> class Track<VectorOfVector> {
-		public:
-			VectorOfVector* data;
-			std::string tag;
-			Track(VectorOfVector& payload, std::string tag = "...") {
-				this->tag = tag;
-				this->data = &payload;
-			}
-			virtual ~Track(){
-				std::vector<double>* temp = NULL;
-				auto& v = *this->data;
-				for(unsigned int i = 0; i < v.size(); i++){
-					temp = v[i];
-					v[i] = NULL;
-					delete temp;
-				}
-				std::cerr << "#MSG[SG].. collected:" << this->tag << std::endl;
-				v.clear();
-			}
-	};
-}
-
 namespace Json {
 	std::string json(const std::unordered_map<std::string, std::string>& m){
 		std::string encoded = "{";

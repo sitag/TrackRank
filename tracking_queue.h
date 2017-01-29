@@ -9,8 +9,9 @@
 #include "cpp-utils/Cmn.h"
 
 namespace TrackingQueue {
+	const unsigned int SENTINEL_COORD = 0xffffffff;
 	struct CoordDist{
-		int coord;
+		unsigned int coord;
 		double d;
 	};
 
@@ -26,7 +27,7 @@ namespace TrackingQueue {
 			static CoordDist sentinel(){
 				//double min = std::numeric_limits<double>::min(); 
 				double min = -std::numeric_limits<double>::max();
-				CoordDist __sentinel = {-1, min};
+				CoordDist __sentinel = {SENTINEL_COORD, min};
 				return __sentinel;
 			}
 	};
@@ -35,14 +36,13 @@ namespace TrackingQueue {
 		public:
 			static CoordDist sentinel(){
 				double max = std::numeric_limits<double>::max(); 
-				CoordDist __sentinel = {-1, max};
+				CoordDist __sentinel = {SENTINEL_COORD, max};
 				return __sentinel;
 			}
 	};
 
 	const CoordDist maxSentinel = Sentinel<MaxTrackingQueueCompare>::sentinel();
 	const CoordDist minSentinel = Sentinel<MinTrackingQueueCompare>::sentinel();
-
 
 	template <typename T, typename C>
 	inline void fillMinSentinels(std::priority_queue<T, std::vector<T>, C>& queue,  int n){
@@ -59,7 +59,7 @@ namespace TrackingQueue {
         } 
 
 	template <typename T>
-	inline void update(double& d, int& coord, std::priority_queue<CoordDist, std::vector<CoordDist>, T>& closest){
+	inline void update(double& d, unsigned int& coord, std::priority_queue<CoordDist, std::vector<CoordDist>, T>& closest){
 		closest.pop();
 		CoordDist updated = {coord, d};
 		closest.push(updated);
