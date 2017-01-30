@@ -1,5 +1,6 @@
 track_rank: getprettyprint cpputils track.cpp
 	g++ ./track.cpp -Wall -O3 -o ./track_rank -static-libgcc -static-libstdc++ -lpthread -std=c++11 -l:Cmn.so -L./cpp-utils -DDEBUGLOG=0 -DTAG="\"$(shell date)\""
+	echo "LD_LIBRARY_PATH will need to be updated to have ./cpp-utils"
 
 cpputils: ./cpp-utils/Cmn.h ./cpp-utils/Cmn.cpp
 	g++ -c -Wall -Werror -fPIC -shared ./cpp-utils/Cmn.cpp -o ./cpp-utils/Cmn.o -std=c++11 -O3
