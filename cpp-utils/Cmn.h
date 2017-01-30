@@ -16,6 +16,7 @@
 
 namespace Json {
 	std::string json(const std::unordered_map<std::string, std::string>& m){
+		if(m.size() == 0) { return "{}";} 
 		std::string encoded = "{";
 		for(auto k = m.begin();;){ 
 			encoded.append("\"");

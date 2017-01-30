@@ -138,15 +138,20 @@ int main(int argc, char* argv[]){
 	Cmn::timestamp(binaryname);
 	Cmn::Parsed parsed(argc, argv);
 
+	auto noMissigArgs = parsed.has2("-nV") &&  parsed.has2("-dim")
+				&& parsed.has2("-track") && parsed.has2("-block-size")
+				&& parsed.has2("-prefix") && parsed.has2("-only-these")  		
+				&& parsed.has2("-rank-these"); 		
+
+	if(parsed.has2("-h") || !noMissigArgs){
+		std::cerr << "usage:\n\t./track_rank -nV:<N> -eigen-values:<file> -vectors:<file> -dim:<N> -rank-these:<file> -only-these:<file> -block-size:2 -prefix:<prefix>" << std::endl;
+		std::exit(1);
+	} 
+
 	//bool debug = parsed.has2("-debug");
 	auto prefix = parsed["-prefix"];
 	auto fTrackThese = parsed["-only-these"];
 	auto fRankThese = parsed["-rank-these"];
-
-	if(parsed.has2("-h")){
-		std::cerr << "usage:\n\t./track_rank -nV:<N> -eigen-values:<file> -vectors:<file> -dim:<N> -rank-these:<file> -track-these:<file> -block-size:2 -prefix:<prefix>" << std::endl;
-		std::exit(1);
-	} 
 
 	const unsigned int dim = std::stoi(parsed["-dim"]);
 	const unsigned int track = std::stoi(parsed["-track"]); // ignored now 
